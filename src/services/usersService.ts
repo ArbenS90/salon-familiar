@@ -17,7 +17,7 @@ export const usersService = {
     // Mapear a formato User
     const users: User[] = (profiles || []).map((profile: any) => ({
       id: profile.user_id,
-      email: profile.user_id === currentUser?.id ? currentUser.email : undefined,
+      email: profile.user_id === currentUser?.id ? currentUser?.email : undefined,
       profile: {
         id: profile.id,
         user_id: profile.user_id,
