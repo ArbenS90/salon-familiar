@@ -46,10 +46,30 @@ CREATE TRIGGER update_fichajes_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
--- Función helper para obtener el rol del usuario actual
+-- Función helper para obtener el rol del usuario actual (bypass RLS)
 CREATE OR REPLACE FUNCTION get_user_role(user_uuid UUID)
 RETURNS TEXT AS $$
   SELECT role FROM profiles WHERE user_id = user_uuid;
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- Función helper para verificar si el usuario actual es ADMIN o SUPER_ADMIN (bypass RLS)
+CREATE OR REPLACE FUNCTION is_admin_or_super_admin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE user_id = auth.uid() 
+    AND role IN ('ADMIN', 'SUPER_ADMIN')
+  );
+$$ LANGUAGE sql SECURITY DEFINER;
+
+-- Función helper para verificar si el usuario actual es SUPER_ADMIN (bypass RLS)
+CREATE OR REPLACE FUNCTION is_super_admin()
+RETURNS BOOLEAN AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM profiles 
+    WHERE user_id = auth.uid() 
+    AND role = 'SUPER_ADMIN'
+  );
 $$ LANGUAGE sql SECURITY DEFINER;
 
 -- Función trigger para prevenir que usuarios cambien su propio rol
@@ -58,12 +78,8 @@ RETURNS TRIGGER AS $$
 BEGIN
   -- Si el usuario está intentando cambiar su propio rol y no es SUPER_ADMIN
   IF OLD.user_id = auth.uid() AND OLD.role != NEW.role THEN
-    -- Verificar si el usuario es SUPER_ADMIN
-    IF NOT EXISTS (
-      SELECT 1 FROM profiles 
-      WHERE user_id = auth.uid() 
-      AND role = 'SUPER_ADMIN'
-    ) THEN
+    -- Verificar si el usuario es SUPER_ADMIN usando la función helper
+    IF NOT is_super_admin() THEN
       RAISE EXCEPTION 'Los usuarios no pueden cambiar su propio rol';
     END IF;
   END IF;
@@ -101,42 +117,18 @@ CREATE POLICY "Users can update own profile"
 -- ADMIN y SUPER_ADMIN pueden ver todos los perfiles
 CREATE POLICY "Admins can view all profiles"
   ON profiles FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE user_id = auth.uid()
-      AND role IN ('ADMIN', 'SUPER_ADMIN')
-    )
-  );
+  USING (is_admin_or_super_admin());
 
 -- ADMIN y SUPER_ADMIN pueden crear usuarios (insertar perfiles)
 CREATE POLICY "Admins can create profiles"
   ON profiles FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE user_id = auth.uid()
-      AND role IN ('ADMIN', 'SUPER_ADMIN')
-    )
-  );
+  WITH CHECK (is_admin_or_super_admin());
 
 -- Solo SUPER_ADMIN puede cambiar roles
 CREATE POLICY "Super admin can update roles"
   ON profiles FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE user_id = auth.uid()
-      AND role = 'SUPER_ADMIN'
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE user_id = auth.uid()
-      AND role = 'SUPER_ADMIN'
-    )
-  );
+  USING (is_super_admin())
+  WITH CHECK (is_super_admin());
 
 -- ============================================
 -- POLÍTICAS RLS PARA FICHAJES
@@ -166,51 +158,21 @@ CREATE POLICY "Users can delete own fichajes"
 -- ADMIN y SUPER_ADMIN pueden ver todos los fichajes
 CREATE POLICY "Admins can view all fichajes"
   ON fichajes FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE user_id = auth.uid()
-      AND role IN ('ADMIN', 'SUPER_ADMIN')
-    )
-  );
+  USING (is_admin_or_super_admin());
 
 -- ADMIN y SUPER_ADMIN pueden crear fichajes para cualquier usuario
 CREATE POLICY "Admins can create fichajes"
   ON fichajes FOR INSERT
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE user_id = auth.uid()
-      AND role IN ('ADMIN', 'SUPER_ADMIN')
-    )
-  );
+  WITH CHECK (is_admin_or_super_admin());
 
 -- ADMIN y SUPER_ADMIN pueden actualizar cualquier fichaje
 CREATE POLICY "Admins can update fichajes"
   ON fichajes FOR UPDATE
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE user_id = auth.uid()
-      AND role IN ('ADMIN', 'SUPER_ADMIN')
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE user_id = auth.uid()
-      AND role IN ('ADMIN', 'SUPER_ADMIN')
-    )
-  );
+  USING (is_admin_or_super_admin())
+  WITH CHECK (is_admin_or_super_admin());
 
 -- ADMIN y SUPER_ADMIN pueden eliminar cualquier fichaje
 CREATE POLICY "Admins can delete fichajes"
   ON fichajes FOR DELETE
-  USING (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE user_id = auth.uid()
-      AND role IN ('ADMIN', 'SUPER_ADMIN')
-    )
-  );
+  USING (is_admin_or_super_admin());
 

@@ -1,0 +1,12 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.ns", "deno.window", "dom"]
+  },
+  "tasks": {},
+  "imports": {},
+  "fmt": {
+    "useTabs": false,
+    "indentWidth": 2,
+    "lineWidth": 80
+  }
+}
