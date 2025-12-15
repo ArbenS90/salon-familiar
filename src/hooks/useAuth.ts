@@ -9,12 +9,9 @@ export function useAuth() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Cargar usuario actual al montar
-    loadUser()
-
-    // Escuchar cambios de autenticación
+    // Escuchar cambios de autenticación (FUENTE ÚNICA DE VERDAD)
     const { data: { subscription } } = authService.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         if (session?.user) {
           setUser(session.user)
           const userProfile = await authService.getProfile(session.user.id)
@@ -32,23 +29,10 @@ export function useAuth() {
     }
   }, [])
 
-  const loadUser = async () => {
-    try {
-      const currentUser = await authService.getCurrentUser()
-      if (currentUser) {
-        setUser(currentUser)
-        const userProfile = await authService.getProfile(currentUser.id)
-        setProfile(userProfile)
-      }
-    } catch (error) {
-      console.error('Error loading user:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const login = async (email: string, password: string) => {
-    const { user: loggedUser, profile: userProfile } = await authService.login({ email, password })
+    const { user: loggedUser, profile: userProfile } =
+      await authService.login({ email, password })
+
     setUser(loggedUser)
     setProfile(userProfile)
     return { user: loggedUser, profile: userProfile }
@@ -60,7 +44,9 @@ export function useAuth() {
     setProfile(null)
   }
 
-  const isAdmin = () => profile?.role === 'ADMIN' || profile?.role === 'SUPER_ADMIN'
+  const isAdmin = () =>
+    profile?.role === 'ADMIN' || profile?.role === 'SUPER_ADMIN'
+
   const isSuperAdmin = () => profile?.role === 'SUPER_ADMIN'
 
   return {
@@ -71,7 +57,6 @@ export function useAuth() {
     logout,
     isAdmin,
     isSuperAdmin,
-    isAuthenticated: !!user
+    isAuthenticated: !!user,
   }
 }
-
